@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover">
+  <meta name="description" content="Chess Master — шахматы с сильным AI. Играй онлайн бесплатно.">
+  <meta name="theme-color" content="#080503">
+  <title>♟ Chess Master — Шахматы онлайн</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <header class="site-header">
+    <div class="logo"><span>♟</span> Chess Master</div>
+    <nav class="nav-links">
+      <a href="#game">Игра</a>
+      <a href="https://lichess.org" target="_blank">Lichess</a>
+      <a href="https://chess.com" target="_blank">Chess.com</a>
+    </nav>
+  </header>
+
+  <div class="page-wrap">
+    <div id="game" class="app">
+
+      <!-- Top player card -->
+      <div class="pcard" id="cardTop">
+        <div class="pavatar" id="avatTop">♚</div>
+        <div class="pmid">
+          <div class="pname" id="nameTop">Чёрные</div>
+          <div class="pcaps" id="capsTop"></div>
+        </div>
+        <div class="pright">
+          <div class="ptimer" id="tmTop">10:00</div>
+          <div class="padv" id="advTop"></div>
+        </div>
+      </div>
+
+      <!-- Board -->
+      <div class="board-area">
+        <div class="board-wrap">
+          <div class="rank-col" id="rankCol"></div>
+          <div class="board-col">
+            <canvas id="cv" width="480" height="480"></canvas>
+            <div class="file-row" id="fileRow"></div>
+          </div>
+        </div>
+        <div class="evalbar"><div class="evalfill" id="evalFill"></div></div>
+        <div class="promo-overlay" id="promoOvl">
+          <div class="promo-title">Выбери фигуру</div>
+          <div class="promo-row" id="promoRow"></div>
+        </div>
+      </div>
+
+      <div class="status" id="statusEl">Белые начинают</div>
+      <div class="aibar" id="aiBar">🤖 AI анализирует...</div>
+
+      <!-- Bottom player card -->
+      <div class="pcard" id="cardBot">
+        <div class="pavatar" id="avatBot">♔</div>
+        <div class="pmid">
+          <div class="pname" id="nameBot">Белые</div>
+          <div class="pcaps" id="capsBot"></div>
+        </div>
+        <div class="pright">
+          <div class="ptimer" id="tmBot">10:00</div>
+          <div class="padv" id="advBot"></div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="ctrl">
+        <div class="btn-row">
+          <button class="pill on" id="btn2p">👥 2 Игрока</button>
+          <button class="pill" id="btnAi">🤖 Против AI</button>
+          <button class="pill act" id="btnNew">♻ Новая</button>
+          <button class="pill flip" id="btnFlip">⇅ Flip</button>
+        </div>
+        <div class="diff-row" id="diffRow" style="display:none">
+          <button class="diff" data-d="0">Лёгкий</button>
+          <button class="diff" data-d="1">Норм</button>
+          <button class="diff" data-d="2">Тяжёлый</button>
+          <button class="diff" data-d="3">Эксперт</button>
+          <button class="diff" data-d="4">Мастер</button>
+          <button class="diff on" data-d="5">Гроссмейстер</button>
+        </div>
+      </div>
+
+      <!-- Opening detector -->
+      <div id="openingPanel" style="display:none;background:var(--card);border:1px solid var(--gold3);border-radius:50px;padding:7px 18px;text-align:center;">
+        <span style="font-size:.62rem;color:var(--dim);letter-spacing:1px;font-family:'Cinzel',serif">ДЕБЮТ</span>
+        <span style="font-size:.78rem;color:var(--gold2);font-weight:700;margin-left:8px;letter-spacing:.5px" id="openingName"></span>
+      </div>
+
+      <!-- History -->
+      <div class="hist">
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px">
+          <div class="hist-title" style="margin-bottom:0">📜 История ходов</div>
+          <button id="btnCopy" style="background:var(--faint);border:1px solid var(--border);border-radius:30px;padding:4px 12px;font-size:.62rem;font-family:'JetBrains Mono',monospace;color:var(--dim);cursor:pointer;transition:all .2s;white-space:nowrap">📋 Копировать</button>
+        </div>
+        <div class="hist-scroll" id="histScroll">
+          <span class="hist-empty">— нет ходов —</span>
+        </div>
+      </div>
+
+    </div><!-- /.app -->
+
+    <footer class="site-footer">
+      <p>♟ Chess Master &nbsp;·&nbsp; Построено на <a href="https://github.com/jhlywa/chess.js" target="_blank">chess.js</a></p>
+      <p style="margin-top:6px;font-size:.55rem;opacity:.5">© 2025 Chess Master. Все права защищены.</p>
+    </footer>
+  </div><!-- /.page-wrap -->
+
+  <script src="chess.js"></script>
+</body>
+</html>
