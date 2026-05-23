@@ -1,0 +1,13 @@
+
+services:
+  - type: web
+    name: chess-uz-server   # Название сервиса, можешь оставить как есть
+    env: node               # Указываем, что это Node.js приложение
+    plan: free              # Используем бесплатный тарифный план
+    rootDir: server         # ✅ ВАЖНО: указываем, что код сервера находится в папке /server
+    buildCommand: npm install  # Команда для установки зависимостей
+    startCommand: node server.js  # Команда для запуска сервера
+    envVars:
+      # Эта переменная важна для корректной работы WebSocket на Render
+      - key: NODE_VERSION
+        value: 18.18.0
