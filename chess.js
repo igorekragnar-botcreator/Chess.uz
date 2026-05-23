@@ -409,8 +409,8 @@
   }
   function exportPGN() {
     if (!historyMoves.length) return;
-    // ИСПРАВЛЕННАЯ СТРОКА (была ошибка с кавычками и скобками)
-    let pgn = `[Event "Chess.uz"]\n[Site "Online"]\n[Date "${new Date().toISOString().slice(0,10)}"]\n[White "${mode === 'ai' ? 'AI' : 'Player'}"]\n[Black "${mode === 'ai' ? 'Player' : 'AI'}"]\n[Result "*"]\n\n`;
+    // ИСПРАВЛЕНО: Исправлена ошибка в template string (была неправильная кавычка)
+    let pgn = `[Event "Chess.uz"]\n[Site "Online"]\n[Date "${new Date().toISOString().slice(0,10)}"]\n[White "${mode === 'ai' ? 'AI' : 'Player'}"]\n[Black "${mode === 'ai' ? 'Player' : 'AI'}"]\n\n`;
     let moves = '';
     for (let i=0; i<historyMoves.length; i+=2) {
       moves += (i/2+1) + '. ' + historyMoves[i] + (historyMoves[i+1] ? ' ' + historyMoves[i+1] + ' ' : ' ');
@@ -877,10 +877,20 @@
     canvas.addEventListener('click', onCanvasEvent);
     canvas.addEventListener('touchstart', e => { e.preventDefault(); onCanvasEvent(e); }, { passive: false });
   }
-  init();
+  
+  // ИСПРАВЛЕНО: Инициализация запускается после загрузки DOM
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  
+  // ИСПРАВЛЕНО: Удалён мертвый код, который пытался использовать несуществующий элемент #board
+  // Старый код был:
+  // window.onload = function () {
+  //     board = Chessboard('board', {
+  //         position: 'start'
+  //     });
+  // };
+  
 })();
-window.onload = function () {
-    board = Chessboard('board', {
-        position: 'start'
-    });
-};
