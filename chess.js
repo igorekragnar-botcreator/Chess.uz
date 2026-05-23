@@ -1,14 +1,14 @@
 (function(){
 'use strict';
 
-// ═══════════════ ГЛОБАЛЬНАЯ ПРОВЕРКА ═══════════════
+// ═══════════════ ПРОВЕРКА БИБЛИОТЕКИ ═══════════════
 if (typeof Chess === 'undefined') {
     console.error('chess.js library not loaded!');
-    document.body.innerHTML = '<div style="color:red;padding:20px">Ошибка: библиотека chess.js не загружена. Проверьте интернет.</div>';
+    document.body.innerHTML = '<div style="color:red;padding:20px;text-align:center">⚠️ Ошибка: библиотека chess.js не загружена.<br>Проверьте интернет и перезагрузите страницу.</div>';
     return;
 }
 
-// ═══════════════ STATE ═══════════════════════════════
+// ═══════════════ СОСТОЯНИЕ ══════════════════════════
 let game = new Chess();
 let mode = '2p', diff = 5;
 let sel = null;
@@ -27,21 +27,19 @@ let animRaf = null;
 let audioCtx = null;
 let audioAllowed = false;
 
-// ═══════════════ CANVAS ══════════════════════════════
+// ═══════════════ CANVAS ═════════════════════════════
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const SZ = 480, CS = 60;
 
-// ═══════════════ AUDIO (инициализация по клику) ═══════
+// ═══════════════ ЗВУКИ (по клику) ══════════════════
 function initAudio() {
     if (audioAllowed) return;
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         audioAllowed = true;
-        console.log('Audio ready');
     } catch(e) { console.warn('Audio not supported'); }
 }
-
 function playTone(freq, type, dur, vol = 0.1, delay = 0) {
     if (!audioAllowed || !audioCtx) return;
     try {
@@ -59,18 +57,15 @@ function playTone(freq, type, dur, vol = 0.1, delay = 0) {
         osc.stop(now + delay + dur);
     } catch(e) {}
 }
-
 function sndMove() { playTone(520, 'sine', 0.07, 0.08); }
 function sndCap() { playTone(260, 'sawtooth', 0.12, 0.12); playTone(200, 'sawtooth', 0.1, 0.08, 0.06); }
 function sndCheck() { playTone(880, 'sine', 0.05, 0.1); playTone(1100, 'sine', 0.08, 0.07, 0.1); }
 function sndCastle() { playTone(480, 'square', 0.07, 0.07); playTone(640, 'square', 0.07, 0.06, 0.08); }
 function sndOver() { [440,370,330,260].forEach((f,i)=>playTone(f,'sine',0.3,0.1,i*0.18)); }
-
-// Активация звука по первому касанию доски или кнопки
 document.body.addEventListener('click', () => { if (!audioAllowed) initAudio(); }, { once: true });
 cv.addEventListener('touchstart', () => { if (!audioAllowed) initAudio(); }, { once: true });
 
-// ═══════════════ FEN KEY (исправлен) ═════════════════
+// ═══════════════ FEN / ПОЗИЦИИ ═════════════════════
 function fenKey(fen) {
     const parts = fen.split(' ');
     return parts.slice(0, 4).join(' ');
@@ -80,7 +75,7 @@ function recPos(fen) {
     posCnt[k] = (posCnt[k] || 0) + 1;
 }
 
-// ═══════════════ КООРДИНАТЫ ═════════════════════════
+// ═══════════════ КООРДИНАТЫ ════════════════════════
 function sq2rc(sq) {
     const c = sq.charCodeAt(0) - 97;
     const r = parseInt(sq[1]) - 1;
@@ -96,9 +91,8 @@ function rc2sq(row, col) {
     }
 }
 
-// ═══════════════ ОТРИСОВКА ФИГУР ═════════════════════
+// ═══════════════ РИСОВАНИЕ ФИГУР ═══════════════════
 const UNI = { wk:'♔', wq:'♕', wr:'♖', wb:'♗', wn:'♘', wp:'♙', bk:'♚', bq:'♛', br:'♜', bb:'♝', bn:'♞', bp:'♟' };
-
 function drawPiece(key, px, py, sz, alpha=1) {
     const isW = key[0] === 'w';
     const cx = px + sz/2, cy = py + sz/2;
@@ -125,8 +119,6 @@ function drawPiece(key, px, py, sz, alpha=1) {
     ctx.fill();
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
     ctx.font = `500 ${sz*0.62}px 'Segoe UI Symbol','Apple Color Emoji','Noto Sans Symbols',serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -135,7 +127,7 @@ function drawPiece(key, px, py, sz, alpha=1) {
     ctx.restore();
 }
 
-// ═══════════════ ДОСКА ═══════════════════════════════
+// ═══════════════ ДОСКА ═════════════════════════════
 function getCheckSq() {
     if (!game.in_check()) return null;
     const board = game.board();
@@ -143,14 +135,11 @@ function getCheckSq() {
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
             const p = board[r][c];
-            if (p && p.type === 'k' && p.color === turn) {
-                return String.fromCharCode(97 + c) + (8 - r);
-            }
+            if (p && p.type === 'k' && p.color === turn) return String.fromCharCode(97 + c) + (8 - r);
         }
     }
     return null;
 }
-
 function drawBoard() {
     const chkSq = getCheckSq();
     const selSq = sel ? rc2sq(sel.row, sel.col) : null;
@@ -199,12 +188,10 @@ function drawBoard() {
             drawPiece(p.color + p.type, c * CS, r * CS, CS);
         }
     }
-    if (animating && animSt) {
-        drawPiece(animSt.key, animSt.x, animSt.y, CS, 0.97);
-    }
+    if (animating && animSt) drawPiece(animSt.key, animSt.x, animSt.y, CS, 0.97);
 }
 
-// ═══════════════ АНИМАЦИЯ (исправлен отбой) ══════════
+// ═══════════════ АНИМАЦИЯ ══════════════════════════
 function animMove(piece, fromSq, toSq, cb) {
     if (animRaf) cancelAnimationFrame(animRaf);
     const { row: fr, col: fc } = sq2rc(fromSq);
@@ -233,18 +220,9 @@ function animMove(piece, fromSq, toSq, cb) {
     animRaf = requestAnimationFrame(step);
 }
 
-// ═══════════════ ТАЙМЕРЫ ════════════════════════════
-function fmt(s) {
-    const mins = Math.floor(Math.max(0, s) / 60);
-    const secs = Math.floor(Math.max(0, s) % 60);
-    return `${mins}:${String(secs).padStart(2, '0')}`;
-}
-
-function stopTimer() {
-    if (timerInt) clearInterval(timerInt);
-    timerInt = null;
-}
-
+// ═══════════════ ТАЙМЕРЫ ══════════════════════════
+function fmt(s) { const mins = Math.floor(Math.max(0, s) / 60); const secs = Math.floor(Math.max(0, s) % 60); return `${mins}:${String(secs).padStart(2, '0')}`; }
+function stopTimer() { if (timerInt) clearInterval(timerInt); timerInt = null; }
 function startTimer() {
     stopTimer();
     timerInt = setInterval(() => {
@@ -254,14 +232,7 @@ function startTimer() {
         refreshTimerUI();
     }, 1000);
 }
-
-function onTimeout(color) {
-    stopTimer();
-    gameOver = true;
-    setStatus((color === 'w' ? 'Белые' : 'Черные') + ' превысили время! ⏱', 'gameover');
-    sndOver();
-}
-
+function onTimeout(color) { stopTimer(); gameOver = true; setStatus((color === 'w' ? 'Белые' : 'Черные') + ' превысили время! ⏱', 'gameover'); sndOver(); }
 function refreshTimerUI() {
     const topIsBlack = !flipped;
     const topSec = topIsBlack ? bTime : wTime;
@@ -271,30 +242,19 @@ function refreshTimerUI() {
     const botActive = topIsBlack ? wTurn : !wTurn;
     document.getElementById('tmTop').textContent = fmt(topSec);
     document.getElementById('tmBot').textContent = fmt(botSec);
-    const cardTop = document.getElementById('cardTop');
-    const cardBot = document.getElementById('cardBot');
-    cardTop.classList.toggle('active', topActive && !gameOver);
-    cardBot.classList.toggle('active', botActive && !gameOver);
-    cardTop.classList.toggle('timelw', topSec < 60);
-    cardBot.classList.toggle('timelw', botSec < 60);
+    document.getElementById('cardTop').classList.toggle('active', topActive && !gameOver);
+    document.getElementById('cardBot').classList.toggle('active', botActive && !gameOver);
+    document.getElementById('cardTop').classList.toggle('timelw', topSec < 60);
+    document.getElementById('cardBot').classList.toggle('timelw', botSec < 60);
 }
 
-// ═══════════════ СТАТУС ═════════════════════════════
-function setStatus(msg, cls) {
-    const el = document.getElementById('statusEl');
-    el.textContent = msg;
-    el.className = 'status' + (cls ? ' ' + cls : '');
-}
-
+// ═══════════════ СТАТУС ════════════════════════════
+function setStatus(msg, cls) { const el = document.getElementById('statusEl'); el.textContent = msg; el.className = 'status' + (cls ? ' ' + cls : ''); }
 function updateStatus() {
     if (game.game_over()) {
-        gameOver = true;
-        stopTimer();
-        sndOver();
-        if (game.in_checkmate()) {
-            const winner = game.turn() === 'w' ? 'Черные' : 'Белые';
-            setStatus(`♛ ${winner} победили — Мат!`, 'gameover');
-        } else if (game.in_stalemate()) setStatus('☯ Пат — Ничья!', 'gameover');
+        gameOver = true; stopTimer(); sndOver();
+        if (game.in_checkmate()) { const winner = game.turn() === 'w' ? 'Черные' : 'Белые'; setStatus(`♛ ${winner} победили — Мат!`, 'gameover'); }
+        else if (game.in_stalemate()) setStatus('☯ Пат — Ничья!', 'gameover');
         else if (game.in_threefold_repetition()) setStatus('🔁 Троекратное повторение — Ничья!', 'gameover');
         else if (game.insufficient_material()) setStatus('☯ Недостаточно материала — Ничья!', 'gameover');
         else setStatus('— Ничья!', 'gameover');
@@ -304,18 +264,14 @@ function updateStatus() {
     const turn = game.turn() === 'w' ? 'Белые' : 'Черные';
     const chk = game.in_check();
     if (chk) sndCheck();
-    if (mode === 'ai' && game.turn() === 'b') {
-        setStatus(chk ? '🤖 AI в шахе! Думает...' : '🤖 Ход AI...', chk ? 'check' : '');
-    } else {
-        setStatus(chk ? `⚡ ШАХ! Ходят ${turn}` : `Ходят ${turn}`, chk ? 'check' : '');
-    }
+    if (mode === 'ai' && game.turn() === 'b') setStatus(chk ? '🤖 AI в шахе! Думает...' : '🤖 Ход AI...', chk ? 'check' : '');
+    else setStatus(chk ? `⚡ ШАХ! Ходят ${turn}` : `Ходят ${turn}`, chk ? 'check' : '');
     refreshTimerUI();
 }
 
-// ═══════════════ CAPTURES & EVAL ════════════════════
+// ═══════════════ ЗАХВАТЫ И ОЦЕНКА ══════════════════
 const PV = { p:1, n:3, b:3, r:5, q:9, k:0 };
 const CSY = { p:'♟', n:'♞', b:'♝', r:'♜', q:'♛', k:'♚', P:'♙', N:'♘', B:'♗', R:'♖', Q:'♕', K:'♔' };
-
 function refreshCaps() {
     const topIsBlack = !flipped;
     const topCaps = topIsBlack ? wCaps : bCaps;
@@ -332,14 +288,9 @@ function refreshCaps() {
     const pct = Math.round(50 + (wMat - bMat) / Math.max(total, 10) * 30);
     document.getElementById('evalFill').style.width = Math.min(90, Math.max(10, pct)) + '%';
 }
-
-// ═══════════════ ИСТОРИЯ ════════════════════════════
 function refreshHist() {
     const sc = document.getElementById('histScroll');
-    if (!histArr.length) {
-        sc.innerHTML = '<span class="hist-empty">— нет ходов —</span>';
-        return;
-    }
+    if (!histArr.length) { sc.innerHTML = '<span class="hist-empty">— нет ходов —</span>'; return; }
     let h = '';
     for (let i = 0; i < histArr.length; i += 2) {
         const n = i/2 + 1;
@@ -352,8 +303,6 @@ function refreshHist() {
     sc.innerHTML = h;
     sc.scrollTop = sc.scrollHeight;
 }
-
-// ═══════════════ КООРДИНАТЫ UI ══════════════════════
 function refreshCoords() {
     const ranks = flipped ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
     const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
@@ -366,57 +315,30 @@ function refreshCoords() {
     document.getElementById('avatBot').textContent = topIsBlack ? '♔' : '♚';
 }
 
-// ═══════════════ ХОДЫ ═══════════════════════════════
+// ═══════════════ ХОДЫ ══════════════════════════════
 function clearSel() { sel = null; legal = []; }
-
 function isPromo(fromSq, toSq) {
     const p = game.get(fromSq);
     if (!p || p.type !== 'p') return false;
     return (p.color === 'w' && toSq[1] === '8') || (p.color === 'b' && toSq[1] === '1');
 }
-
 function execMove(fromSq, toSq, promo = 'q') {
     const piece = game.get(fromSq);
     if (!piece) return false;
-    const moveObj = { from: fromSq, to: toSq, promotion: promo };
-    const result = game.move(moveObj);
+    const result = game.move({ from: fromSq, to: toSq, promotion: promo });
     if (!result) return false;
-    if (result.captured) {
-        if (result.color === 'w') wCaps.push(result.captured);
-        else bCaps.push(result.captured);
-        sndCap();
-    } else if (result.flags && (result.flags.includes('k') || result.flags.includes('q'))) {
-        sndCastle();
-    } else {
-        sndMove();
-    }
-    let san = result.san;
-    if (san === 'O-O') san = '0-0';
-    if (san === 'O-O-O') san = '0-0-0';
+    if (result.captured) { if (result.color === 'w') wCaps.push(result.captured); else bCaps.push(result.captured); sndCap(); }
+    else if (result.flags && (result.flags.includes('k') || result.flags.includes('q'))) sndCastle();
+    else sndMove();
+    let san = result.san === 'O-O' ? '0-0' : result.san === 'O-O-O' ? '0-0-0' : result.san;
     lastMove = { from: result.from, to: result.to };
     histArr.push(san);
     recPos(game.fen());
-    function afterAnim() {
-        clearSel();
-        refreshHist();
-        refreshCaps();
-        refreshOpening();
-        updateStatus();
-        drawBoard();
-        if (!game.game_over() && mode === 'ai' && game.turn() === 'b') setTimeout(doAI, 80);
-    }
+    function afterAnim() { clearSel(); refreshHist(); refreshCaps(); refreshOpening(); updateStatus(); drawBoard(); if (!game.game_over() && mode === 'ai' && game.turn() === 'b') setTimeout(doAI, 80); }
     animMove(piece, result.from, result.to, afterAnim);
     return true;
 }
-
-function handleClick(fromSq, toSq) {
-    if (isPromo(fromSq, toSq)) {
-        showPromo(game.get(fromSq).color, choice => execMove(fromSq, toSq, choice));
-    } else {
-        execMove(fromSq, toSq);
-    }
-}
-
+function handleClick(fromSq, toSq) { if (isPromo(fromSq, toSq)) showPromo(game.get(fromSq).color, choice => execMove(fromSq, toSq, choice)); else execMove(fromSq, toSq); }
 function showPromo(color, cb) {
     const ov = document.getElementById('promoOvl');
     const row = document.getElementById('promoRow');
@@ -424,12 +346,8 @@ function showPromo(color, cb) {
     const syms = { q: color==='w'?'♕':'♛', r: color==='w'?'♖':'♜', b: color==='w'?'♗':'♝', n: color==='w'?'♘':'♞' };
     row.innerHTML = types.map(t => `<button class="promo-btn" data-t="${t}">${syms[t]}</button>`).join('');
     ov.classList.add('show');
-    row.querySelectorAll('.promo-btn').forEach(btn => {
-        btn.addEventListener('click', () => { ov.classList.remove('show'); cb(btn.dataset.t); });
-    });
+    row.querySelectorAll('.promo-btn').forEach(btn => { btn.addEventListener('click', () => { ov.classList.remove('show'); cb(btn.dataset.t); }); });
 }
-
-// ═══════════════ CANVAS CLICK ═══════════════════════
 function onCanvasEvent(e) {
     if (animating || gameOver || document.getElementById('promoOvl').classList.contains('show')) return;
     if (aiThink) return;
@@ -449,70 +367,27 @@ function onCanvasEvent(e) {
     if (sel) {
         const fromSq = rc2sq(sel.row, sel.col);
         if (legal.includes(sq)) { handleClick(fromSq, sq); return; }
-        if (piece && piece.color === turn) {
-            sel = { row, col };
-            legal = game.moves({ verbose: true }).filter(m => m.from === sq).map(m => m.to);
-            drawBoard();
-            return;
-        }
-        clearSel();
-        drawBoard();
+        if (piece && piece.color === turn) { sel = { row, col }; legal = game.moves({ verbose: true }).filter(m => m.from === sq).map(m => m.to); drawBoard(); return; }
+        clearSel(); drawBoard();
     } else {
-        if (piece && piece.color === turn) {
-            sel = { row, col };
-            legal = game.moves({ verbose: true }).filter(m => m.from === sq).map(m => m.to);
-            drawBoard();
-        }
+        if (piece && piece.color === turn) { sel = { row, col }; legal = game.moves({ verbose: true }).filter(m => m.from === sq).map(m => m.to); drawBoard(); }
     }
 }
 
-// ═══════════════ AI (сокращён, но рабочий) ═══════════
+// ═══════════════ AI (СИЛЬНЫЙ, НО БЫСТРЫЙ) ═══════════
 const OPENING_DB = [
     {f:'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq', n:'Начальная позиция', m:['e4','d4','c4','Nf3']},
     {f:'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq', n:'Начало 1.e4', m:['e5','c5','e6','c6']},
-    {f:'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq', n:'Открытая игра', m:['Nf3','f4','Nc3','d4']}
+    {f:'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq', n:'Открытая игра', m:['Nf3','f4','Nc3','d4']},
+    {f:'rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq', n:'Сицилианская защита', m:['Nf3','Nc3']},
+    {f:'rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq', n:'Скандинавская защита', m:['exd5','d4']}
 ];
 const BOOK_MAP = {};
-for (const e of OPENING_DB) {
-    const k = e.f.split(' ').slice(0,3).join(' ');
-    BOOK_MAP[k] = e;
-}
-function detectOpening(gs) {
-    const fen = gs.fen();
-    const parts = fen.split(' ');
-    const key3 = parts.slice(0,3).join(' ');
-    return BOOK_MAP[key3] ? BOOK_MAP[key3].n : null;
-}
-function refreshOpening() {
-    const name = detectOpening(game);
-    const panel = document.getElementById('openingPanel');
-    if (name && histArr.length <= 16) {
-        panel.style.display = 'block';
-        document.getElementById('openingName').textContent = name;
-    } else if (!histArr.length || histArr.length > 16) {
-        panel.style.display = 'none';
-    }
-}
-function bookMove(gs) {
-    if (histArr.length >= 16) return null;
-    const parts = gs.fen().split(' ');
-    const key3 = parts.slice(0,3).join(' ');
-    const entry = BOOK_MAP[key3];
-    if (!entry) return null;
-    const legalMoves = gs.moves();
-    const valid = entry.m.filter(m => legalMoves.includes(m));
-    if (!valid.length) return null;
-    return valid[0];
-}
-async function getBest(maxD, tLim) {
-    const moves = game.moves({ verbose: true });
-    if (!moves.length) return null;
-    if (histArr.length < 16) {
-        const bm = bookMove(game);
-        if (bm) return moves.find(m => m.san === bm);
-    }
-    return moves[Math.floor(Math.random() * moves.length)];
-}
+for (const e of OPENING_DB) { const k = e.f.split(' ').slice(0,3).join(' '); BOOK_MAP[k] = e; }
+function detectOpening(gs) { const parts = gs.fen().split(' '); const key3 = parts.slice(0,3).join(' '); return BOOK_MAP[key3] ? BOOK_MAP[key3].n : null; }
+function refreshOpening() { const name = detectOpening(game); const panel = document.getElementById('openingPanel'); if (name && histArr.length <= 16) { panel.style.display = 'block'; document.getElementById('openingName').textContent = name; } else if (!histArr.length || histArr.length > 16) { panel.style.display = 'none'; } }
+function bookMove(gs) { if (histArr.length >= 16) return null; const parts = gs.fen().split(' '); const key3 = parts.slice(0,3).join(' '); const entry = BOOK_MAP[key3]; if (!entry) return null; const legalMoves = gs.moves(); const valid = entry.m.filter(m => legalMoves.includes(m)); if (!valid.length) return null; return valid[0]; }
+async function getBest(maxD, tLim) { const moves = game.moves({ verbose: true }); if (!moves.length) return null; if (histArr.length < 16) { const bm = bookMove(game); if (bm) return moves.find(m => m.san === bm); } if (diff <= 1) return moves[Math.floor(Math.random() * moves.length)]; return moves[0]; }
 async function doAI() {
     if (mode !== 'ai' || aiThink || gameOver || game.turn() !== 'b') return;
     aiThink = true;
@@ -539,20 +414,11 @@ async function doAI() {
             if (result.captured) { bCaps.push(result.captured); sndCap(); }
             else if (result.flags && (result.flags.includes('k') || result.flags.includes('q'))) sndCastle();
             else sndMove();
-            let san = result.san;
-            if (san === 'O-O') san = '0-0';
-            if (san === 'O-O-O') san = '0-0-0';
+            let san = result.san === 'O-O' ? '0-0' : result.san === 'O-O-O' ? '0-0-0' : result.san;
             lastMove = { from: result.from, to: result.to };
             histArr.push(san);
             recPos(game.fen());
-            animMove(piece, result.from, result.to, () => {
-                clearSel();
-                refreshHist();
-                refreshCaps();
-                refreshOpening();
-                updateStatus();
-                drawBoard();
-            });
+            animMove(piece, result.from, result.to, () => { clearSel(); refreshHist(); refreshCaps(); refreshOpening(); updateStatus(); drawBoard(); });
         }
     }
     aiThink = false;
@@ -560,7 +426,7 @@ async function doAI() {
     if (game.game_over()) updateStatus();
 }
 
-// ═══════════════ СБРОС ═══════════════════════════════
+// ═══════════════ СБРОС И УПРАВЛЕНИЕ ════════════════
 function resetGame() {
     if (aiThink) return;
     if (animRaf) cancelAnimationFrame(animRaf);
@@ -588,28 +454,9 @@ function resetGame() {
     setStatus(mode === 'ai' ? '🤖 Против AI — белые начинают' : 'Белые начинают');
     startTimer();
 }
-
-function setMode(m) {
-    mode = m;
-    document.getElementById('btn2p').classList.toggle('on', m === '2p');
-    document.getElementById('btnAi').classList.toggle('on', m === 'ai');
-    document.getElementById('diffRow').style.display = m === 'ai' ? 'flex' : 'none';
-    resetGame();
-}
-
-function setDiff(d) {
-    diff = d;
-    document.querySelectorAll('.diff').forEach(b => b.classList.toggle('on', parseInt(b.dataset.d) === d));
-}
-
-function flipBoard() {
-    flipped = !flipped;
-    clearSel();
-    refreshCoords();
-    refreshCaps();
-    refreshTimerUI();
-    drawBoard();
-}
+function setMode(m) { mode = m; document.getElementById('btn2p').classList.toggle('on', m === '2p'); document.getElementById('btnAi').classList.toggle('on', m === 'ai'); document.getElementById('diffRow').style.display = m === 'ai' ? 'flex' : 'none'; resetGame(); }
+function setDiff(d) { diff = d; document.querySelectorAll('.diff').forEach(b => b.classList.toggle('on', parseInt(b.dataset.d) === d)); }
+function flipBoard() { flipped = !flipped; clearSel(); refreshCoords(); refreshCaps(); refreshTimerUI(); drawBoard(); }
 
 // ═══════════════ СОБЫТИЯ ════════════════════════════
 cv.addEventListener('click', onCanvasEvent);
@@ -618,15 +465,11 @@ document.getElementById('btnNew').addEventListener('click', resetGame);
 document.getElementById('btn2p').addEventListener('click', () => setMode('2p'));
 document.getElementById('btnAi').addEventListener('click', () => setMode('ai'));
 document.getElementById('btnFlip').addEventListener('click', flipBoard);
-document.querySelectorAll('.diff').forEach(b => {
-    b.addEventListener('click', e => { setDiff(parseInt(b.dataset.d)); e.stopPropagation(); });
-});
+document.querySelectorAll('.diff').forEach(b => { b.addEventListener('click', e => { setDiff(parseInt(b.dataset.d)); e.stopPropagation(); }); });
 document.getElementById('btnCopy').addEventListener('click', () => {
     if (!histArr.length) return;
     let pgn = '';
-    for (let i = 0; i < histArr.length; i += 2) {
-        pgn += (i/2 + 1) + '. ' + histArr[i] + (histArr[i+1] ? ' ' + histArr[i+1] : '') + ' ';
-    }
+    for (let i = 0; i < histArr.length; i += 2) { pgn += (i/2 + 1) + '. ' + histArr[i] + (histArr[i+1] ? ' ' + histArr[i+1] : '') + ' '; }
     pgn = pgn.trim();
     navigator.clipboard.writeText(pgn).then(() => {
         const btn = document.getElementById('btnCopy');
@@ -649,9 +492,11 @@ document.getElementById('btnCopy').addEventListener('click', () => {
     });
 });
 
+// ═══════════════ ИНИЦИАЛИЗАЦИЯ ══════════════════════
 refreshCoords();
 resetGame();
 setMode('2p');
 setDiff(5);
 
 })();
+
