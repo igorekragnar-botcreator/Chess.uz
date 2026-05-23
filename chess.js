@@ -487,4 +487,171 @@ function refreshOpening() {
     const name = detectOpening(game);
     const panel = document.getElementById('openingPanel');
     if (name && histArr.length <= 16) {
-        panel.style.display = '
+        panel.style.display = 'block';
+        document.getElementById('openingName').textContent = name;
+    } else if (!histArr.length || histArr.length > 16) {
+        panel.style.display = 'none';
+    }
+}
+function bookMove(gs) {
+    if (histArr.length >= 16) return null;
+    const parts = gs.fen().split(' ');
+    const key3 = parts.slice(0,3).join(' ');
+    const entry = BOOK_MAP[key3];
+    if (!entry) return null;
+    const legalMoves = gs.moves();
+    const valid = entry.m.filter(m => legalMoves.includes(m));
+    if (!valid.length) return null;
+    return valid[0];
+}
+async function getBest(maxD, tLim) {
+    const moves = game.moves({ verbose: true });
+    if (!moves.length) return null;
+    if (histArr.length < 16) {
+        const bm = bookMove(game);
+        if (bm) return moves.find(m => m.san === bm);
+    }
+    return moves[Math.floor(Math.random() * moves.length)];
+}
+async function doAI() {
+    if (mode !== 'ai' || aiThink || gameOver || game.turn() !== 'b') return;
+    aiThink = true;
+    document.getElementById('aiBar').classList.add('show');
+    refreshTimerUI();
+    const levelNames = ['🌿 Лёгкий','🌀 Норм','⚡ Тяжёлый','🔥 Эксперт','👑 Мастер','✨ Гроссмейстер'];
+    const bar = document.getElementById('aiBar');
+    bar.textContent = '🤖 ' + levelNames[diff] + ' думает...';
+    await new Promise(r => setTimeout(r, 30));
+    let maxD = 1, tL = 300;
+    switch(diff) {
+        case 0: maxD=1; tL=50; break;
+        case 1: maxD=2; tL=200; break;
+        case 2: maxD=4; tL=1500; break;
+        case 3: maxD=6; tL=3500; break;
+        case 4: maxD=9; tL=7000; break;
+        case 5: maxD=14; tL=12000; break;
+    }
+    const mv = await getBest(maxD, tL);
+    if (mv && !gameOver) {
+        const piece = game.get(mv.from);
+        const result = game.move(mv);
+        if (result) {
+            if (result.captured) { bCaps.push(result.captured); sndCap(); }
+            else if (result.flags && (result.flags.includes('k') || result.flags.includes('q'))) sndCastle();
+            else sndMove();
+            let san = result.san;
+            if (san === 'O-O') san = '0-0';
+            if (san === 'O-O-O') san = '0-0-0';
+            lastMove = { from: result.from, to: result.to };
+            histArr.push(san);
+            recPos(game.fen());
+            animMove(piece, result.from, result.to, () => {
+                clearSel();
+                refreshHist();
+                refreshCaps();
+                refreshOpening();
+                updateStatus();
+                drawBoard();
+            });
+        }
+    }
+    aiThink = false;
+    document.getElementById('aiBar').classList.remove('show');
+    if (game.game_over()) updateStatus();
+}
+
+// ═══════════════ СБРОС ═══════════════════════════════
+function resetGame() {
+    if (aiThink) return;
+    if (animRaf) cancelAnimationFrame(animRaf);
+    game = new Chess();
+    clearSel();
+    gameOver = false;
+    aiThink = false;
+    animating = false;
+    animSt = null;
+    histArr = [];
+    posCnt = {};
+    wCaps = [];
+    bCaps = [];
+    wTime = 600;
+    bTime = 600;
+    lastMove = null;
+    stopTimer();
+    document.getElementById('promoOvl').classList.remove('show');
+    document.getElementById('aiBar').classList.remove('show');
+    refreshHist();
+    refreshCaps();
+    refreshOpening();
+    refreshTimerUI();
+    drawBoard();
+    setStatus(mode === 'ai' ? '🤖 Против AI — белые начинают' : 'Белые начинают');
+    startTimer();
+}
+
+function setMode(m) {
+    mode = m;
+    document.getElementById('btn2p').classList.toggle('on', m === '2p');
+    document.getElementById('btnAi').classList.toggle('on', m === 'ai');
+    document.getElementById('diffRow').style.display = m === 'ai' ? 'flex' : 'none';
+    resetGame();
+}
+
+function setDiff(d) {
+    diff = d;
+    document.querySelectorAll('.diff').forEach(b => b.classList.toggle('on', parseInt(b.dataset.d) === d));
+}
+
+function flipBoard() {
+    flipped = !flipped;
+    clearSel();
+    refreshCoords();
+    refreshCaps();
+    refreshTimerUI();
+    drawBoard();
+}
+
+// ═══════════════ СОБЫТИЯ ════════════════════════════
+cv.addEventListener('click', onCanvasEvent);
+cv.addEventListener('touchstart', e => { e.preventDefault(); onCanvasEvent(e); }, { passive: false });
+document.getElementById('btnNew').addEventListener('click', resetGame);
+document.getElementById('btn2p').addEventListener('click', () => setMode('2p'));
+document.getElementById('btnAi').addEventListener('click', () => setMode('ai'));
+document.getElementById('btnFlip').addEventListener('click', flipBoard);
+document.querySelectorAll('.diff').forEach(b => {
+    b.addEventListener('click', e => { setDiff(parseInt(b.dataset.d)); e.stopPropagation(); });
+});
+document.getElementById('btnCopy').addEventListener('click', () => {
+    if (!histArr.length) return;
+    let pgn = '';
+    for (let i = 0; i < histArr.length; i += 2) {
+        pgn += (i/2 + 1) + '. ' + histArr[i] + (histArr[i+1] ? ' ' + histArr[i+1] : '') + ' ';
+    }
+    pgn = pgn.trim();
+    navigator.clipboard.writeText(pgn).then(() => {
+        const btn = document.getElementById('btnCopy');
+        btn.textContent = '✅ Скопировано!';
+        btn.style.color = '#6dcc8a';
+        btn.style.borderColor = '#3d6b4f';
+        setTimeout(() => { btn.textContent = '📋 Копировать'; btn.style.color = ''; btn.style.borderColor = ''; }, 2000);
+    }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = pgn;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        const btn = document.getElementById('btnCopy');
+        btn.textContent = '✅ Скопировано!';
+        setTimeout(() => { btn.textContent = '📋 Копировать'; }, 2000);
+    });
+});
+
+refreshCoords();
+resetGame();
+setMode('2p');
+setDiff(5);
+
+})();
