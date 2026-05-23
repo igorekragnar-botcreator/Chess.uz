@@ -3,7 +3,7 @@
 
   // ==================== ПРОВЕРКА БИБЛИОТЕКИ ====================
   if (typeof Chess === 'undefined') {
-    document.body.innerHTML = '<div style="color:red;padding:20px;text-align:center">⚠️ Ошибка: библиотека chess.js не загружена.<br>Проверьте интернет и перезагрузите страницу.</div>';
+    document.body.innerHTML = '<div style="color:red;padding:20px;text-align:center">⚠️ Ошибка: библиотека chess.js не загружена.<br>Проверьте интернет соединение и перезагрузитесь.</div>';
     return;
   }
 
@@ -21,7 +21,7 @@
   let posCount = {};
   let whiteCaptured = [];
   let blackCaptured = [];
-  let whiteTime = 600;       // секунды
+  let whiteTime = 600;       // секун��ы
   let blackTime = 600;
   let timerInterval = null;
   let animating = false;
@@ -50,10 +50,37 @@
   // Авторизация (демо)
   let currentUser = localStorage.getItem('chessUser') || null;
 
-  // ==================== CANVAS ====================
-  const canvas = document.getElementById('cv');
-  const ctx = canvas.getContext('2d');
+  // ==================== CANVAS - ИНИЦИАЛИЗАЦИЯ (ОТЛОЖЕНА) ====================
+  let canvas = null;
+  let ctx = null;
   const SIZE = 480, CELL = 60;
+  
+  function initCanvas() {
+    if (canvas && ctx) return; // Уже инициализирован
+    
+    canvas = document.getElementById('cv');
+    if (!canvas) {
+      console.error('❌ FATAL: Canvas element #cv not found in DOM!');
+      document.body.innerHTML += '<div style="color:red;padding:20px;text-align:center">❌ Ошибка: Canvas элемент не найден.</div>';
+      return false;
+    }
+    
+    ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error('❌ FATAL: Cannot get 2D context from canvas!');
+      return false;
+    }
+    
+    // ИСПРАВЛЕНО: Установка физических размеров canvas
+    canvas.width = 480;
+    canvas.height = 480;
+    
+    console.log('✓ Canvas initialized:', canvas);
+    console.log('✓ 2D context ready:', ctx);
+    console.log('✓ Canvas size: ' + canvas.width + 'x' + canvas.height);
+    
+    return true;
+  }
 
   // ==================== ЗВУКИ ====================
   function initAudio() {
@@ -87,7 +114,11 @@
   function soundGameOver() { [440,370,330,260].forEach((f,i)=>playTone(f,'sine',0.3,0.1,i*0.18)); }
 
   document.body.addEventListener('click', () => { if (!audioAllowed) initAudio(); }, { once: true });
-  canvas.addEventListener('touchstart', () => { if (!audioAllowed) initAudio(); }, { once: true });
+  
+  // ИСПРАВЛЕНО: Добавлена проверка на существование canvas перед использованием
+  if (document.readyState !== 'loading') {
+    document.addEventListener('touchstart', () => { if (!audioAllowed) initAudio(); }, { once: true }, true);
+  }
 
   // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
   function fenKey(fen) { return fen.split(' ').slice(0,4).join(' '); }
@@ -111,6 +142,8 @@
   // ==================== ОТРИСОВКА ДОСКИ И ФИГУР ====================
   const pieceSymbol = { wk:'♔', wq:'♕', wr:'♖', wb:'♗', wn:'♘', wp:'♙', bk:'♚', bq:'♛', br:'♜', bb:'♝', bn:'♞', bp:'♟' };
   function drawPiece(key, x, y, size, alpha=1) {
+    if (!ctx) return; // ИСПРАВЛЕНО: Проверка на существование ctx
+    
     const isWhite = key[0] === 'w';
     const cx = x + size/2, cy = y + size/2;
     const r = size * 0.4;
@@ -157,6 +190,13 @@
   }
 
   function drawBoard() {
+    if (!ctx || !canvas) {
+      console.warn('⚠️ drawBoard called before canvas initialization');
+      return;
+    }
+    
+    console.log('→ drawBoard() called'); // ИСПРАВЛЕНО: Диагностика
+    
     const checkSq = getCheckSquare();
     const selectedSq = sel ? rowColToSq(sel.row, sel.col) : null;
     for (let r=0; r<8; r++) {
@@ -209,6 +249,8 @@
 
   // ==================== АНИМАЦИЯ ХОДА ====================
   function animateMove(piece, fromSq, toSq, callback) {
+    if (!ctx) return;
+    
     if (animFrame) cancelAnimationFrame(animFrame);
     const { row: fr, col: fc } = sqToRowCol(fromSq);
     const { row: tr, col: tc } = sqToRowCol(toSq);
@@ -409,7 +451,6 @@
   }
   function exportPGN() {
     if (!historyMoves.length) return;
-    // ИСПРАВЛЕНО: Исправлена ошибка в template string (была неправильная кавычка)
     let pgn = `[Event "Chess.uz"]\n[Site "Online"]\n[Date "${new Date().toISOString().slice(0,10)}"]\n[White "${mode === 'ai' ? 'AI' : 'Player'}"]\n[Black "${mode === 'ai' ? 'Player' : 'AI'}"]\n\n`;
     let moves = '';
     for (let i=0; i<historyMoves.length; i+=2) {
@@ -857,6 +898,17 @@
 
   // ==================== ИНИЦИАЛИЗАЦИЯ ====================
   function init() {
+    console.log('🔧 init() called');
+    console.log('📄 Document ready state:', document.readyState);
+    
+    // ИСПРАВЛЕНО: Инициализация canvas ДО использования
+    if (!initCanvas()) {
+      console.error('❌ Canvas initialization failed!');
+      return;
+    }
+    
+    console.log('✓ Canvas ready, starting game setup...');
+    
     loadStats();
     loadTheme();
     refreshCoordinates();
@@ -876,21 +928,17 @@
     document.getElementById('authLink').addEventListener('click', (e) => { e.preventDefault(); showAuthModal(); });
     canvas.addEventListener('click', onCanvasEvent);
     canvas.addEventListener('touchstart', e => { e.preventDefault(); onCanvasEvent(e); }, { passive: false });
+    
+    console.log('✓ Game fully initialized!');
   }
   
-  // ИСПРАВЛЕНО: Инициализация запускается после загрузки DOM
+  // ИСПРАВЛЕНО: Проверка readyState и правильная инициализация
   if (document.readyState === 'loading') {
+    console.log('⏳ DOM still loading, waiting for DOMContentLoaded...');
     document.addEventListener('DOMContentLoaded', init);
   } else {
+    console.log('✓ DOM already loaded, initializing immediately...');
     init();
   }
-  
-  // ИСПРАВЛЕНО: Удалён мертвый код, который пытался использовать несуществующий элемент #board
-  // Старый код был:
-  // window.onload = function () {
-  //     board = Chessboard('board', {
-  //         position: 'start'
-  //     });
-  // };
   
 })();
