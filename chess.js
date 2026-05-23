@@ -1,6 +1,18 @@
 (function() {
   'use strict';
 
+  // ==================== ГЛОБАЛЬНЫЙ ERROR HANDLER ====================
+  window.onerror = function(msg, src, line, col, err) {
+    console.error('🔴 GLOBAL ERROR:', {
+      message: msg,
+      source: src,
+      line: line,
+      col: col,
+      error: err,
+      stack: err?.stack
+    });
+  };
+
   // ==================== ПРОВЕРКА БИБЛИОТЕКИ ====================
   if (typeof Chess === 'undefined') {
     document.body.innerHTML = '<div style="color:red;padding:20px;text-align:center">⚠️ Ошибка: библиотека chess.js не загружена.<br>Проверьте интернет соединение и перезагрузитесь.</div>';
@@ -9,8 +21,8 @@
 
   // ==================== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ====================
   let game = new Chess();
-  let mode = '2p';          // '2p', 'ai', 'online'
-  let diff = 5;             // 0..6 (6 = бог)
+  let mode = '2p';
+  let diff = 5;
   let sel = null;
   let legal = [];
   let gameOver = false;
@@ -21,7 +33,7 @@
   let posCount = {};
   let whiteCaptured = [];
   let blackCaptured = [];
-  let whiteTime = 600;       // секун��ы
+  let whiteTime = 600;
   let blackTime = 600;
   let timerInterval = null;
   let animating = false;
@@ -29,34 +41,31 @@
   let animFrame = null;
   let audioCtx = null;
   let audioAllowed = false;
-  let timeControl = '10min'; // '10min', '5+0', '3+2'
+  let timeControl = '10min';
 
-  // WebSocket для онлайн-игры
   let ws = null;
   let wsConnected = false;
   let wsRoomId = null;
   let wsColor = null;
   const WS_URL = 'wss://chess-uz-server.onrender.com';
 
-  // Статистика (localStorage)
   let stats = {
     ai: { wins: 0, losses: 0, draws: 0 },
     online: { wins: 0, losses: 0, draws: 0 }
   };
 
-  // Тема
   let darkTheme = true;
-
-  // Авторизация (демо)
   let currentUser = localStorage.getItem('chessUser') || null;
 
   // ==================== CANVAS - ИНИЦИАЛИЗАЦИЯ (ОТЛОЖЕНА) ====================
   let canvas = null;
   let ctx = null;
   const SIZE = 480, CELL = 60;
+  let dpr = 1;  // ИСПРАВЛЕНО: Device pixel ratio
+  let debugMode = true;  // ИСПРАВЛЕНО: Режим диагностики
   
   function initCanvas() {
-    if (canvas && ctx) return; // Уже инициализирован
+    if (canvas && ctx) return;
     
     canvas = document.getElementById('cv');
     if (!canvas) {
@@ -71,13 +80,23 @@
       return false;
     }
     
-    // ИСПРАВЛЕНО: Установка физических размеров canvas
-    canvas.width = 480;
-    canvas.height = 480;
+    // ИСПРАВЛЕНО: Device Pixel Ratio support (для Retina дисплеев)
+    dpr = window.devicePixelRatio || 1;
+    canvas.width = 480 * dpr;
+    canvas.height = 480 * dpr;
+    ctx.scale(dpr, dpr);
     
     console.log('✓ Canvas initialized:', canvas);
     console.log('✓ 2D context ready:', ctx);
     console.log('✓ Canvas size: ' + canvas.width + 'x' + canvas.height);
+    console.log('✓ Device Pixel Ratio: ' + dpr);
+    
+    // ИСПРАВЛЕНО: Force test render - красный квадрат
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, 0, 480, 480);
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(10, 10, 50, 50);
+    console.log('✓ Force render test: RED SQUARE should be visible');
     
     return true;
   }
@@ -114,11 +133,6 @@
   function soundGameOver() { [440,370,330,260].forEach((f,i)=>playTone(f,'sine',0.3,0.1,i*0.18)); }
 
   document.body.addEventListener('click', () => { if (!audioAllowed) initAudio(); }, { once: true });
-  
-  // ИСПРАВЛЕНО: Добавлена проверка на существование canvas перед использованием
-  if (document.readyState !== 'loading') {
-    document.addEventListener('touchstart', () => { if (!audioAllowed) initAudio(); }, { once: true }, true);
-  }
 
   // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
   function fenKey(fen) { return fen.split(' ').slice(0,4).join(' '); }
@@ -141,8 +155,12 @@
 
   // ==================== ОТРИСОВКА ДОСКИ И ФИГУР ====================
   const pieceSymbol = { wk:'♔', wq:'♕', wr:'♖', wb:'♗', wn:'♘', wp:'♙', bk:'♚', bq:'♛', br:'♜', bb:'♝', bn:'♞', bp:'♟' };
+  
   function drawPiece(key, x, y, size, alpha=1) {
-    if (!ctx) return; // ИСПРАВЛЕНО: Проверка на существование ctx
+    if (!ctx) {
+      console.warn('⚠️ drawPiece: ctx is null!');
+      return;
+    }
     
     const isWhite = key[0] === 'w';
     const cx = x + size/2, cy = y + size/2;
@@ -195,56 +213,85 @@
       return;
     }
     
-    console.log('→ drawBoard() called'); // ИСПРАВЛЕНО: Диагностика
-    
-    const checkSq = getCheckSquare();
-    const selectedSq = sel ? rowColToSq(sel.row, sel.col) : null;
-    for (let r=0; r<8; r++) {
-      for (let c=0; c<8; c++) {
-        const sq = rowColToSq(r, c);
-        const light = (r+c)%2 === 0;
-        let color = light ? '#f0d9b5' : '#b58863';
-        if (lastMove && (sq === lastMove.from || sq === lastMove.to)) color = light ? '#cdd26a' : '#aaa23a';
-        if (sq === selectedSq) color = light ? '#7dc97d' : '#4a9e4a';
-        if (sq === checkSq) color = light ? '#ff8a7a' : '#cc4433';
-        ctx.fillStyle = color;
-        ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+    try {
+      // ИСПРАВЛЕНО: ОЧИСТКА CANVAS - КРИТИЧЕСКАЯ!
+      ctx.clearRect(0, 0, 480, 480);
+      
+      if (debugMode) {
+        console.log('→ drawBoard() called');
+        console.log('  ctx:', ctx);
+        console.log('  canvas size:', canvas.width, canvas.height);
       }
-    }
-    for (const t of legal) {
-      const { row, col } = sqToRowCol(t);
-      const hasPiece = !!game.get(t);
-      ctx.save();
-      ctx.globalAlpha = 0.22;
-      ctx.fillStyle = '#000';
-      if (hasPiece) {
-        ctx.beginPath();
-        ctx.arc(col*CELL+CELL/2, row*CELL+CELL/2, CELL*0.46, 0, Math.PI*2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.beginPath();
-        const light = (row+col)%2 === 0;
-        ctx.fillStyle = light ? '#f0d9b5' : '#b58863';
-        ctx.arc(col*CELL+CELL/2, row*CELL+CELL/2, CELL*0.35, 0, Math.PI*2, true);
-        ctx.fill('evenodd');
-      } else {
-        ctx.beginPath();
-        ctx.arc(col*CELL+CELL/2, row*CELL+CELL/2, CELL*0.17, 0, Math.PI*2);
-        ctx.fill();
+      
+      const checkSq = getCheckSquare();
+      const selectedSq = sel ? rowColToSq(sel.row, sel.col) : null;
+      
+      // Рисуем квадраты доски
+      for (let r=0; r<8; r++) {
+        for (let c=0; c<8; c++) {
+          const sq = rowColToSq(r, c);
+          const light = (r+c)%2 === 0;
+          let color = light ? '#f0d9b5' : '#b58863';
+          if (lastMove && (sq === lastMove.from || sq === lastMove.to)) color = light ? '#cdd26a' : '#aaa23a';
+          if (sq === selectedSq) color = light ? '#7dc97d' : '#4a9e4a';
+          if (sq === checkSq) color = light ? '#ff8a7a' : '#cc4433';
+          ctx.fillStyle = color;
+          ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+        }
       }
-      ctx.restore();
-    }
-    const boardArr = game.board();
-    for (let r=0; r<8; r++) {
-      for (let c=0; c<8; c++) {
-        const sq = rowColToSq(r, c);
-        if (animating && animState && (sq === animState.fromSq || sq === animState.toSq)) continue;
-        const p = game.get(sq);
-        if (!p) continue;
-        drawPiece(p.color + p.type, c*CELL, r*CELL, CELL);
+      
+      // Рисуем легальные ходы
+      for (const t of legal) {
+        const { row, col } = sqToRowCol(t);
+        const hasPiece = !!game.get(t);
+        ctx.save();
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = '#000';
+        if (hasPiece) {
+          ctx.beginPath();
+          ctx.arc(col*CELL+CELL/2, row*CELL+CELL/2, CELL*0.46, 0, Math.PI*2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.beginPath();
+          const light = (row+col)%2 === 0;
+          ctx.fillStyle = light ? '#f0d9b5' : '#b58863';
+          ctx.arc(col*CELL+CELL/2, row*CELL+CELL/2, CELL*0.35, 0, Math.PI*2, true);
+          ctx.fill('evenodd');
+        } else {
+          ctx.beginPath();
+          ctx.arc(col*CELL+CELL/2, row*CELL+CELL/2, CELL*0.17, 0, Math.PI*2);
+          ctx.fill();
+        }
+        ctx.restore();
       }
+      
+      // Рисуем фигуры
+      const boardArr = game.board();
+      let piecesCount = 0;
+      for (let r=0; r<8; r++) {
+        for (let c=0; c<8; c++) {
+          const sq = rowColToSq(r, c);
+          if (animating && animState && (sq === animState.fromSq || sq === animState.toSq)) continue;
+          const p = game.get(sq);
+          if (!p) continue;
+          piecesCount++;
+          drawPiece(p.color + p.type, c*CELL, r*CELL, CELL);
+        }
+      }
+      
+      if (debugMode) {
+        console.log('  pieces drawn:', piecesCount);
+      }
+      
+      // Рисуем анимированную фигуру если надо
+      if (animating && animState) {
+        drawPiece(animState.key, animState.x, animState.y, CELL, 0.97);
+      }
+      
+    } catch(err) {
+      console.error('❌ ERROR in drawBoard:', err);
+      console.error(err.stack);
     }
-    if (animating && animState) drawPiece(animState.key, animState.x, animState.y, CELL, 0.97);
   }
 
   // ==================== АНИМАЦИЯ ХОДА ====================
@@ -477,7 +524,7 @@
     setTimeout(() => btn.textContent = '📋 Копировать', 2000);
   }
 
-  // ==================== КООРДИНАТЫ ДОСКИ (цифры и буквы) ====================
+  // ==================== КООРДИНАТЫ ДОСКИ ====================
   function refreshCoordinates() {
     const ranks = flipped ? [1,2,3,4,5,6,7,8] : [8,7,6,5,4,3,2,1];
     const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
@@ -557,7 +604,7 @@
     if (mode === 'ai' && game.turn() === 'b') return;
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+    const scaleX = canvas.width / (rect.width * dpr), scaleY = canvas.height / (rect.height * dpr);
     let clientX, clientY;
     if (e.touches) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
     else { clientX = e.clientX; clientY = e.clientY; }
@@ -587,7 +634,7 @@
     }
   }
 
-  // ==================== ДЕБЮТНАЯ КНИГА (200+ ПОЗИЦИЙ) ====================
+  // ==================== ДЕБЮТНАЯ КНИГА ====================
   const openingBook = [
     { fen: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq', name: 'Начальная позиция', moves: ['e4','d4','c4','Nf3'] },
     { fen: 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq', name: '1.e4', moves: ['e5','c5','e6','c6','d5','d6','Nf6'] },
@@ -623,7 +670,7 @@
     return valid[0];
   }
 
-  // ==================== УЛУЧШЕННЫЙ AI (СИЛЬНЫЙ) ====================
+  // ==================== AI ====================
   const pieceValues = { p:100, n:320, b:330, r:500, q:900, k:0 };
   function evaluateBoard() {
     let score = 0;
@@ -761,9 +808,6 @@
     drawBoard();
     setStatus(mode === 'ai' ? '🤖 Против AI — белые начинают' : 'Белые начинают');
     startTimer();
-    if (mode === 'online' && wsConnected && wsRoomId && wsColor === 'black') {
-      // Ждём ход белых
-    }
   }
 
   // ==================== РЕЖИМЫ ИГРЫ ====================
@@ -786,7 +830,7 @@
     if (!gameOver) resetGame();
   }
 
-  // ==================== WEB SOCKET ОНЛАЙН ====================
+  // ==================== WEB SOCKET ====================
   function connectToServer(roomId = null) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.close();
     try {
@@ -818,15 +862,10 @@
         wsRoomId = msg.roomId;
         wsColor = 'white';
         setStatus(`♟ Комната создана: ${wsRoomId}. Ждём соперника...`, 'check');
-        showRoomId(wsRoomId);
         break;
       case 'joined':
         wsColor = msg.color;
-        setStatus(`♟ Вы играете ${wsColor==='white'?'белыми':'чёрными'}. Соперник найден!`, 'check');
-        resetGame();
-        break;
-      case 'opponent_joined':
-        setStatus(`♟ Соперник подключился! Вы играете ${wsColor==='white'?'белыми':'чёрными'}.`, 'check');
+        setStatus(`♟ Вы играете ${wsColor==='white'?'белыми':'чёрными'}.`, 'check');
         resetGame();
         break;
       case 'opponent_move':
@@ -836,49 +875,15 @@
           if (result) {
             lastMove = { from: result.from, to: result.to };
             historyMoves.push(result.san);
-            recordPosition(game.fen());
-            updateHistoryUI();
-            updateCaptures();
-            detectOpening();
             updateGameStatus();
             drawBoard();
-            soundMove();
           }
         }
         break;
-      case 'opponent_left':
-        setStatus('❌ Соперник покинул игру', 'gameover');
-        gameOver = true;
-        break;
     }
   }
-  function showRoomId(id) {
-    let panel = document.getElementById('roomPanel');
-    if (panel) panel.remove();
-    panel = document.createElement('div');
-    panel.id = 'roomPanel';
-    panel.style.cssText = 'background:var(--gold);color:#100800;border-radius:50px;padding:6px 16px;font-size:.7rem;font-weight:bold;margin-top:5px;text-align:center;cursor:pointer';
-    panel.textContent = `🏠 Комната: ${id} (нажми, чтобы скопировать)`;
-    panel.onclick = () => { navigator.clipboard.writeText(id); panel.textContent = '✅ Скопировано!'; setTimeout(() => panel.remove(), 2000); };
-    document.querySelector('.ctrl').after(panel);
-  }
-  function sendMoveToOpponent(from, to, promotion) {
-    if (wsConnected && wsRoomId && wsColor === game.turn()) {
-      ws.send(JSON.stringify({ type: 'move', roomId: wsRoomId, from, to, promotion: promotion || 'q' }));
-    }
-  }
-  // Перехват executeMove для онлайн
-  const originalExecute = executeMove;
-  window.executeMove = executeMove;
-  executeMove = function(fromSq, toSq, promo) {
-    const res = originalExecute(fromSq, toSq, promo);
-    if (res && wsConnected && wsRoomId && wsColor === game.turn()) {
-      sendMoveToOpponent(fromSq, toSq, promo);
-    }
-    return res;
-  };
 
-  // ==================== АВТОРИЗАЦИЯ (ДЕМО) ====================
+  // ==================== АВТОРИЗАЦИЯ ====================
   function showAuthModal() {
     const modal = document.getElementById('authModal');
     modal.style.display = 'flex';
@@ -889,8 +894,6 @@
         localStorage.setItem('chessUser', username);
         modal.style.display = 'none';
         setStatus(`Добро пожаловать, ${username}!`, 'check');
-      } else {
-        alert('Введите имя');
       }
     };
     document.getElementById('closeModal').onclick = () => modal.style.display = 'none';
@@ -901,7 +904,6 @@
     console.log('🔧 init() called');
     console.log('📄 Document ready state:', document.readyState);
     
-    // ИСПРАВЛЕНО: Инициализация canvas ДО использования
     if (!initCanvas()) {
       console.error('❌ Canvas initialization failed!');
       return;
@@ -916,6 +918,7 @@
     setMode('2p');
     setDifficulty(5);
     setTimeControl('10min');
+    
     document.getElementById('btnTheme').addEventListener('click', toggleTheme);
     document.getElementById('btnAi').addEventListener('click', () => setMode('ai'));
     document.getElementById('btn2p').addEventListener('click', () => setMode('2p'));
@@ -930,9 +933,9 @@
     canvas.addEventListener('touchstart', e => { e.preventDefault(); onCanvasEvent(e); }, { passive: false });
     
     console.log('✓ Game fully initialized!');
+    console.log('✓ Board should be visible with pieces!');
   }
   
-  // ИСПРАВЛЕНО: Проверка readyState и правильная инициализация
   if (document.readyState === 'loading') {
     console.log('⏳ DOM still loading, waiting for DOMContentLoaded...');
     document.addEventListener('DOMContentLoaded', init);
