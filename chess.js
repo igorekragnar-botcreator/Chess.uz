@@ -27,6 +27,15 @@ let animRaf = null;
 let audioCtx = null;
 let audioAllowed = false;
 
+// ═══════════════ WEBSOCKET ДЛЯ ОНЛАЙН-ИГРЫ ═══════════
+let ws = null;
+let wsConnected = false;
+let wsRoomId = null;
+let wsColor = null;
+
+// ✅ ПРАВИЛЬНЫЙ URL СЕРВЕРА (ЗАМЕНИТЕ НА ВАШ, ЕСЛИ ОТЛИЧАЕТСЯ)
+const SERVER_URL = 'wss://chess-uz-server.onrender.com';
+
 // ═══════════════ CANVAS ═════════════════════════════
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
@@ -457,6 +466,170 @@ function resetGame() {
 function setMode(m) { mode = m; document.getElementById('btn2p').classList.toggle('on', m === '2p'); document.getElementById('btnAi').classList.toggle('on', m === 'ai'); document.getElementById('diffRow').style.display = m === 'ai' ? 'flex' : 'none'; resetGame(); }
 function setDiff(d) { diff = d; document.querySelectorAll('.diff').forEach(b => b.classList.toggle('on', parseInt(b.dataset.d) === d)); }
 function flipBoard() { flipped = !flipped; clearSel(); refreshCoords(); refreshCaps(); refreshTimerUI(); drawBoard(); }
+
+// ═══════════════ WEBSOCKET КЛИЕНТ ═══════════════════
+function connectToServer(roomId = null) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+    if (!window.WebSocket) { alert('Ваш браузер не поддерживает WebSocket'); return; }
+    
+    try {
+        ws = new WebSocket(SERVER_URL);
+        
+        ws.onopen = () => {
+            wsConnected = true;
+            setStatus('♟ Подключено к серверу...', 'check');
+            if (roomId) {
+                ws.send(JSON.stringify({ type: 'join_room', roomId }));
+            } else {
+                ws.send(JSON.stringify({ type: 'create_room' }));
+            }
+        };
+        
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                handleWsMessage(msg);
+            } catch(e) { console.warn('Ошибка разбора сообщения', e); }
+        };
+        
+        ws.onclose = () => {
+            wsConnected = false;
+            setStatus('🔌 Соединение потеряно. Играем локально.', 'gameover');
+            wsRoomId = null;
+            wsColor = null;
+        };
+        
+        ws.onerror = (err) => {
+            console.error('WebSocket error', err);
+            setStatus('❌ Ошибка соединения с сервером', 'gameover');
+            wsConnected = false;
+        };
+    } catch(e) {
+        setStatus('❌ Не удалось подключиться к серверу', 'gameover');
+    }
+}
+
+function handleWsMessage(msg) {
+    switch (msg.type) {
+        case 'room_created':
+            wsRoomId = msg.roomId;
+            wsColor = 'white';
+            setStatus(`♟ Комната создана: ${wsRoomId}. Ждём соперника...`, 'check');
+            showRoomId(wsRoomId);
+            break;
+        case 'joined':
+            wsColor = msg.color;
+            setStatus(`♟ Вы играете ${wsColor === 'white' ? 'белыми' : 'чёрными'}. Соперник найден!`, 'check');
+            resetGame();
+            break;
+        case 'opponent_joined':
+            setStatus(`♟ Соперник подключился! Вы играете ${wsColor === 'white' ? 'белыми' : 'чёрными'}.`, 'check');
+            resetGame();
+            break;
+        case 'opponent_move':
+            if (!gameOver && game.turn() !== wsColor) {
+                const move = { from: msg.from, to: msg.to, promotion: msg.promotion || 'q' };
+                const result = game.move(move);
+                if (result) {
+                    lastMove = { from: result.from, to: result.to };
+                    histArr.push(result.san);
+                    recPos(game.fen());
+                    refreshHist();
+                    refreshCaps();
+                    refreshOpening();
+                    updateStatus();
+                    drawBoard();
+                    sndMove();
+                }
+            }
+            break;
+        case 'opponent_left':
+            setStatus('❌ Соперник покинул игру', 'gameover');
+            gameOver = true;
+            break;
+        default:
+            console.log('Неизвестный тип сообщения', msg);
+    }
+}
+
+function showRoomId(roomId) {
+    let panel = document.getElementById('roomPanel');
+    if (panel) panel.remove();
+    panel = document.createElement('div');
+    panel.id = 'roomPanel';
+    panel.style.cssText = 'background:var(--gold);color:#100800;border-radius:50px;padding:6px 16px;font-size:.7rem;font-weight:bold;margin-top:5px;text-align:center;cursor:pointer';
+    panel.textContent = `🏠 Комната: ${roomId} (нажми, чтобы скопировать)`;
+    panel.onclick = () => {
+        navigator.clipboard.writeText(roomId);
+        panel.textContent = '✅ Скопировано!';
+        setTimeout(() => panel.remove(), 2000);
+    };
+    document.querySelector('.ctrl').after(panel);
+}
+
+function sendMoveToOpponent(fromSq, toSq, promotion) {
+    if (wsConnected && wsRoomId && wsColor === game.turn()) {
+        ws.send(JSON.stringify({
+            type: 'move',
+            roomId: wsRoomId,
+            from: fromSq,
+            to: toSq,
+            promotion: promotion || 'q'
+        }));
+    }
+}
+
+// Добавляем кнопки онлайн-режима, если их нет в HTML (для совместимости)
+function addOnlineButtons() {
+    if (document.getElementById('btnOnline')) return;
+    const btnRow = document.querySelector('.btn-row');
+    if (!btnRow) return;
+    
+    const btnOnline = document.createElement('button');
+    btnOnline.id = 'btnOnline';
+    btnOnline.className = 'pill';
+    btnOnline.textContent = '🌐 Онлайн';
+    btnOnline.addEventListener('click', () => {
+        if (mode !== '2p') setMode('2p');
+        connectToServer();
+    });
+    
+    const btnConnect = document.createElement('button');
+    btnConnect.id = 'btnConnect';
+    btnConnect.className = 'pill';
+    btnConnect.textContent = '🔗 Подключиться';
+    btnConnect.style.display = 'none';
+    btnConnect.addEventListener('click', () => {
+        const roomId = prompt('Введите ID комнаты:');
+        if (roomId) connectToServer(roomId);
+    });
+    
+    const roomInput = document.createElement('input');
+    roomInput.id = 'roomInput';
+    roomInput.placeholder = 'ID комнаты';
+    roomInput.style.cssText = 'background:var(--faint);border:1px solid var(--border);border-radius:50px;padding:7px 12px;color:var(--text);width:100px;font-size:.7rem;display:none';
+    
+    btnRow.appendChild(btnOnline);
+    btnRow.appendChild(btnConnect);
+    btnRow.parentNode.appendChild(roomInput);
+    
+    // Переключение отображения поля ввода при нажатии на Подключиться
+    btnConnect.addEventListener('click', () => {
+        roomInput.style.display = roomInput.style.display === 'none' ? 'inline-block' : 'none';
+    });
+}
+addOnlineButtons();
+
+// Перехватываем execMove для отправки хода сопернику
+const originalExecMove = execMove;
+window.execMove = execMove; // сохраним оригинал, но переопределим ниже
+execMove = function(fromSq, toSq, promo = 'q') {
+    const result = originalExecMove(fromSq, toSq, promo);
+    if (result && wsConnected && wsRoomId && wsColor === game.turn()) {
+        sendMoveToOpponent(fromSq, toSq, promo);
+    }
+    return result;
+};
 
 // ═══════════════ СОБЫТИЯ ════════════════════════════
 cv.addEventListener('click', onCanvasEvent);
