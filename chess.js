@@ -879,3 +879,8 @@
   }
   init();
 })();
+window.onload = function () {
+    board = Chessboard('board', {
+        position: 'start'
+    });
+};
