@@ -25,8 +25,6 @@ body{
   animation:fadeUp .4s ease both;
 }
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-
-/* ── Player cards ── */
 .pcard{
   background:var(--card);
   border:1px solid var(--border);
@@ -47,7 +45,6 @@ body{
 }
 .pcard.timelw .ptimer{color:#ff6b6b!important;animation:blink 1s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
-
 .pavatar{
   width:40px;height:40px;border-radius:50%;
   background:radial-gradient(circle at 35% 35%,#2e2010,#120c06);
@@ -68,8 +65,6 @@ body{
   text-shadow:0 0 20px rgba(240,200,66,.15);
 }
 .padv{font-size:.6rem;color:var(--gold);font-weight:700;margin-top:2px;min-height:12px}
-
-/* ── Board area ── */
 .board-area{
   background:var(--card);
   border:1px solid var(--border);
@@ -98,8 +93,6 @@ canvas{
   touch-action:manipulation;
   box-shadow:0 8px 32px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.04);
 }
-
-/* ── Promotion overlay ── */
 .promo-overlay{
   position:absolute;inset:0;
   background:rgba(4,2,1,.82);
@@ -124,16 +117,13 @@ canvas{
   transition:border-color .15s,transform .1s;
 }
 .promo-btn:hover{border-color:var(--gold2);transform:scale(1.08)}
-
-/* ── Status & AI bar ── */
 .status{
   background:var(--card);border:1px solid var(--border);
   border-radius:50px;padding:8px 20px;
   text-align:center;font-size:.78rem;color:var(--text);
   letter-spacing:.5px;transition:all .3s;
 }
-.status.check{border-color:#cc4433;color:#ff9988;
-  box-shadow:0 0 16px rgba(204,68,51,.2)}
+.status.check{border-color:#cc4433;color:#ff9988;box-shadow:0 0 16px rgba(204,68,51,.2)}
 .status.gameover{
   border-color:var(--gold);color:var(--gold2);
   font-family:'Cinzel',serif;font-size:.82rem;letter-spacing:1px;
@@ -148,8 +138,6 @@ canvas{
 }
 .aibar.show{display:block}
 @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
-
-/* ── Controls ── */
 .ctrl{
   background:var(--card);border:1px solid var(--border);
   border-radius:var(--radius);padding:12px 14px;
@@ -163,13 +151,11 @@ canvas{
   letter-spacing:.5px;color:var(--dim);cursor:pointer;
   transition:all .15s;touch-action:manipulation;
 }
-.pill.on{background:var(--gold);color:#100800;border-color:var(--gold);
-  box-shadow:0 2px 12px rgba(201,162,39,.3)}
+.pill.on{background:var(--gold);color:#100800;border-color:var(--gold);box-shadow:0 2px 12px rgba(201,162,39,.3)}
 .pill.act{background:var(--green);color:#d0f0d8;border-color:transparent}
 .pill.act:hover{background:#4d7a5e}
 .pill.flip{border-color:var(--border)}
 .pill.flip:hover{border-color:var(--gold);color:var(--gold)}
-
 .diff-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
 .diff{
   border:1px solid var(--border);background:var(--faint);
@@ -178,8 +164,6 @@ canvas{
   cursor:pointer;transition:all .1s;touch-action:manipulation;
 }
 .diff.on{background:var(--gold);color:#100800;border-color:var(--gold)}
-
-/* ── History ── */
 .hist{
   background:var(--card);border:1px solid var(--border);
   border-radius:var(--radius);padding:12px 14px;
@@ -202,8 +186,6 @@ canvas{
 }
 .hmove.hi{background:rgba(201,162,39,.18);color:var(--gold2)}
 .hist-empty{display:block;text-align:center;color:var(--faint);font-size:.72rem;padding:8px}
-
-/* ── Material eval bar ── */
 .evalbar{
   height:4px;background:var(--faint);border-radius:2px;
   overflow:hidden;margin-top:6px;
@@ -213,14 +195,11 @@ canvas{
   border-radius:2px;transition:width .4s ease;
   width:50%;
 }
-
 @media(max-width:380px){
   .pill{padding:6px 12px;font-size:.62rem}
   .diff{padding:4px 9px;font-size:.58rem}
   .ptimer{font-size:1.2rem}
 }
-
-/* ── Website additions ── */
 .site-header{
   position:fixed;top:0;left:0;right:0;z-index:100;
   background:rgba(8,5,3,.92);
